@@ -33,6 +33,7 @@ static int parser_read_char(struct kanshi_parser *parser) {
 		return ch;
 	}
 
+	errno = 0;
 	int ch = fgetc(parser->f);
 	if (ch == EOF) {
 		if (errno != 0) {
