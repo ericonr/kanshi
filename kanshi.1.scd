@@ -41,4 +41,4 @@ https://github.com/emersion/kanshi.
 
 # SEE ALSO
 
-*kanshi*(5)
+*kanshi*(5) *kanshictl*(1)
