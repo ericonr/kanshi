@@ -35,6 +35,7 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
+scfg = dependency('scfg')
 varlink = dependency('libvarlink', required: get_option('ipc'))
 
 add_project_arguments([
@@ -46,6 +47,7 @@ subdir('protocol')
 
 kanshi_deps = [
 	wayland_client,
+	scfg,
 ]
 
 kanshi_srcs = [

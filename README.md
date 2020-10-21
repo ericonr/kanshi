@@ -14,6 +14,7 @@ Join the IRC channel: #emersion on Libera Chat.
 Dependencies:
 
 * wayland-client
+* [libscfg]
 * scdoc (optional, for man pages)
 * libvarlink (optional, for remote control functionality)
 
@@ -58,6 +59,7 @@ MIT
 
 [kanshi]: https://wayland.emersion.fr/kanshi/
 [autorandr]: https://github.com/phillipberndt/autorandr
+[libscfg]: https://git.sr.ht/~emersion/libscfg
 [repo]: https://git.sr.ht/~emersion/kanshi
 [issue-tracker]: https://todo.sr.ht/~emersion/kanshi
 [mailing-list]: https://lists.sr.ht/~emersion/public-inbox

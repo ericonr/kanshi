@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
 #include <errno.h>
+#include <scfg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,183 +12,6 @@
 
 #include "config.h"
 #include "parser.h"
-
-static const char *token_type_str(enum kanshi_token_type t) {
-	switch (t) {
-	case KANSHI_TOKEN_LBRACKET:
-		return "'{'";
-	case KANSHI_TOKEN_RBRACKET:
-		return "'}'";
-	case KANSHI_TOKEN_STR:
-		return "string";
-	case KANSHI_TOKEN_NEWLINE:
-		return "newline";
-	}
-	abort();
-}
-
-static int parser_read_char(struct kanshi_parser *parser) {
-	if (parser->next >= 0) {
-		int ch = parser->next;
-		parser->next = -1;
-		return ch;
-	}
-
-	errno = 0;
-	int ch = fgetc(parser->f);
-	if (ch == EOF) {
-		if (errno != 0) {
-			fprintf(stderr, "fgetc failed: %s\n", strerror(errno));
-		} else {
-			return '\0';
-		}
-		return -1;
-	}
-
-	if (ch == '\n') {
-		parser->line++;
-		parser->col = 0;
-	} else {
-		parser->col++;
-	}
-
-	return ch;
-}
-
-static int parser_peek_char(struct kanshi_parser *parser) {
-	int ch = parser_read_char(parser);
-	parser->next = ch;
-	return ch;
-}
-
-static bool parser_append_tok_ch(struct kanshi_parser *parser, char ch) {
-	// Always keep enough room for a terminating NULL char
-	if (parser->tok_str_len + 1 >= sizeof(parser->tok_str)) {
-		fprintf(stderr, "string too long\n");
-		return false;
-	}
-	parser->tok_str[parser->tok_str_len] = ch;
-	parser->tok_str_len++;
-	return true;
-}
-
-static bool parser_read_quoted(struct kanshi_parser *parser, char quote_char) {
-	while (1) {
-		int ch = parser_read_char(parser);
-		if (ch < 0) {
-			return false;
-		} else if (ch == '\0') {
-			fprintf(stderr, "unterminated quoted string\n");
-			return false;
-		}
-
-		if (ch == quote_char) {
-			parser->tok_str[parser->tok_str_len] = '\0';
-			return true;
-		}
-
-		if (!parser_append_tok_ch(parser, ch)) {
-			return false;
-		}
-	}
-}
-
-static void parser_ignore_line(struct kanshi_parser *parser) {
-	while (1) {
-		int ch = parser_read_char(parser);
-		if (ch < 0) {
-			return;
-		}
-
-		if (ch == '\n' || ch == '\0') {
-			return;
-		}
-	}
-}
-
-static bool parser_read_line(struct kanshi_parser *parser) {
-	while (1) {
-		int ch = parser_peek_char(parser);
-		if (ch < 0) {
-			return false;
-		}
-
-		if (ch == '\n' || ch == '\0') {
-			parser->tok_str[parser->tok_str_len] = '\0';
-			return true;
-		}
-
-		if (!parser_append_tok_ch(parser, parser_read_char(parser))) {
-			return false;
-		}
-	}
-}
-
-static bool parser_read_str(struct kanshi_parser *parser) {
-	while (1) {
-		int ch = parser_peek_char(parser);
-		if (ch < 0) {
-			return false;
-		}
-
-		if (isspace(ch) || ch == '{' || ch == '}' || ch == '\0') {
-			parser->tok_str[parser->tok_str_len] = '\0';
-			return true;
-		}
-
-		if (!parser_append_tok_ch(parser, parser_read_char(parser))) {
-			return false;
-		}
-	}
-}
-
-static bool parser_next_token(struct kanshi_parser *parser) {
-	while (1) {
-		int ch = parser_read_char(parser);
-		if (ch < 0) {
-			return false;
-		}
-
-		if (ch == '{') {
-			parser->tok_type = KANSHI_TOKEN_LBRACKET;
-			return true;
-		} else if (ch == '}') {
-			parser->tok_type = KANSHI_TOKEN_RBRACKET;
-			return true;
-		} else if (ch == '\n') {
-			parser->tok_type = KANSHI_TOKEN_NEWLINE;
-			return true;
-		} else if (isspace(ch)) {
-			continue;
-		} else if (ch == '"' || ch == '\'') {
-			parser->tok_type = KANSHI_TOKEN_STR;
-			parser->tok_str_len = 0;
-			return parser_read_quoted(parser, ch);
-		} else if (ch == '#') {
-			parser_ignore_line(parser);
-			parser->tok_type = KANSHI_TOKEN_NEWLINE;
-			return true;
-		} else {
-			parser->tok_type = KANSHI_TOKEN_STR;
-			parser->tok_str[0] = ch;
-			parser->tok_str_len = 1;
-			return parser_read_str(parser);
-		}
-	}
-}
-
-static bool parser_expect_token(struct kanshi_parser *parser,
-		enum kanshi_token_type want) {
-	if (!parser_next_token(parser)) {
-		return false;
-	}
-	if (parser->tok_type != want) {
-		fprintf(stderr, "expected %s, got %s\n",
-			token_type_str(want), token_type_str(parser->tok_type));
-		return false;
-	}
-	return true;
-}
 
 static bool parse_int(int *dst, const char *str) {
 	char *end;
@@ -301,226 +125,193 @@ static bool parse_bool(bool *dst, const char *str) {
 }
 
 static struct kanshi_profile_output *parse_profile_output(
-		struct kanshi_parser *parser) {
+		struct scfg_directive *dir) {
 	struct kanshi_profile_output *output = calloc(1, sizeof(*output));
 
-	if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
+	if (dir->params_len == 0) {
+		fprintf(stderr, "directive 'output': expected at least one param\n");
 		return NULL;
 	}
-	output->name = strdup(parser->tok_str);
+	output->name = strdup(dir->params[0]);
 
 	bool has_key = false;
-	enum kanshi_output_field key = 0;
-	while (1) {
-		if (!parser_next_token(parser)) {
-			return NULL;
-		}
+	enum kanshi_output_field key;
+	for (size_t i = 1; i < dir->params_len; i++) {
+		char *param = dir->params[i];
 
-		switch (parser->tok_type) {
-		case KANSHI_TOKEN_STR:
-			if (has_key) {
-				char *value = parser->tok_str;
-				switch (key) {
-				case KANSHI_OUTPUT_MODE:
-					if (strcmp(value, "--custom") == 0) {
-						output->mode.custom = true;
-						continue;
-					}
-					if (!parse_mode(output, value)) {
-						return NULL;
-					}
-					break;
-				case KANSHI_OUTPUT_POSITION:
-					if (!parse_position(output, value)) {
-						return NULL;
-					}
-					break;
-				case KANSHI_OUTPUT_SCALE:
-					if (!parse_float(&output->scale, value)) {
-						fprintf(stderr, "invalid output scale\n");
-						return NULL;
-					}
-					break;
-				case KANSHI_OUTPUT_TRANSFORM:
-					if (!parse_transform(&output->transform, value)) {
-						fprintf(stderr, "invalid output transform\n");
-						return NULL;
-					}
-					break;
-				case KANSHI_OUTPUT_ADAPTIVE_SYNC:
-					if (!parse_bool(&output->adaptive_sync, value)) {
-						fprintf(stderr, "invalid output adaptive_sync\n");
-						return NULL;
-					}
-					break;
-				default:
-					abort();
+		if (has_key) {
+			char *value = param;
+			switch (key) {
+			case KANSHI_OUTPUT_MODE:
+				if (strcmp(value, "--custom") == 0) {
+					output->mode.custom = true;
+					continue;
 				}
-				has_key = false;
-				output->fields |= key;
-			} else {
-				has_key = true;
-				const char *key_str = parser->tok_str;
-				if (strcmp(key_str, "enable") == 0) {
-					output->enabled = true;
-					output->fields |= KANSHI_OUTPUT_ENABLED;
-					has_key = false;
-				} else if (strcmp(key_str, "disable") == 0) {
-					output->enabled = false;
-					output->fields |= KANSHI_OUTPUT_ENABLED;
-					has_key = false;
-				} else if (strcmp(key_str, "mode") == 0) {
-					key = KANSHI_OUTPUT_MODE;
-				} else if (strcmp(key_str, "position") == 0) {
-					key = KANSHI_OUTPUT_POSITION;
-				} else if (strcmp(key_str, "scale") == 0) {
-					key = KANSHI_OUTPUT_SCALE;
-				} else if (strcmp(key_str, "transform") == 0) {
-					key = KANSHI_OUTPUT_TRANSFORM;
-				} else if (strcmp(key_str, "adaptive_sync") == 0) {
-					key = KANSHI_OUTPUT_ADAPTIVE_SYNC;
-				} else {
-					fprintf(stderr,
-						"unknown directive '%s' in profile output '%s'\n",
-						key_str, output->name);
+				if (!parse_mode(output, value)) {
 					return NULL;
 				}
+				break;
+			case KANSHI_OUTPUT_POSITION:
+				if (!parse_position(output, value)) {
+					return NULL;
+				}
+				break;
+			case KANSHI_OUTPUT_SCALE:
+				if (!parse_float(&output->scale, value)) {
+					fprintf(stderr, "invalid output scale\n");
+					return NULL;
+				}
+				break;
+			case KANSHI_OUTPUT_TRANSFORM:
+				if (!parse_transform(&output->transform, value)) {
+					fprintf(stderr, "invalid output transform\n");
+					return NULL;
+				}
+				break;
+			case KANSHI_OUTPUT_ADAPTIVE_SYNC:
+				if (!parse_bool(&output->adaptive_sync, value)) {
+					fprintf(stderr, "invalid output adaptive_sync\n");
+					return NULL;
+				}
+				break;
+			default:
+				abort();
 			}
-			break;
-		case KANSHI_TOKEN_NEWLINE:
-			return output;
-		default:
-			fprintf(stderr, "unexpected %s in output\n",
-				token_type_str(parser->tok_type));
-			return NULL;
+			has_key = false;
+			output->fields |= key;
+		} else {
+			has_key = true;
+			const char *key_str = param;
+			if (strcmp(key_str, "enable") == 0) {
+				output->enabled = true;
+				output->fields |= KANSHI_OUTPUT_ENABLED;
+				has_key = false;
+			} else if (strcmp(key_str, "disable") == 0) {
+				output->enabled = false;
+				output->fields |= KANSHI_OUTPUT_ENABLED;
+				has_key = false;
+			} else if (strcmp(key_str, "mode") == 0) {
+				key = KANSHI_OUTPUT_MODE;
+			} else if (strcmp(key_str, "position") == 0) {
+				key = KANSHI_OUTPUT_POSITION;
+			} else if (strcmp(key_str, "scale") == 0) {
+				key = KANSHI_OUTPUT_SCALE;
+			} else if (strcmp(key_str, "transform") == 0) {
+				key = KANSHI_OUTPUT_TRANSFORM;
+			} else if (strcmp(key_str, "adaptive_sync") == 0) {
+				key = KANSHI_OUTPUT_ADAPTIVE_SYNC;
+			} else {
+				fprintf(stderr,
+					"unknown directive '%s' in profile output '%s'\n",
+					key_str, output->name);
+				return NULL;
+			}
 		}
 	}
+
+	return output;
 }
 
-static struct kanshi_profile_command *parse_profile_command(
-		struct kanshi_parser *parser) {
-	// Skip the 'exec' directive.
-	if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
+static struct kanshi_profile_command *parse_profile_exec(
+		struct scfg_directive *dir) {
+	if (dir->params_len == 0) {
+		fprintf(stderr, "directive 'exec': expected at least one param\n");
 		return NULL;
 	}
 
-	if (!parser_read_line(parser)) {
-		return NULL;
+	// Unfortunately older versions of kanshi read the raw bytes from the
+	// config file until the end of the line, bypassing the regular scfg
+	// syntax. This makes it pretty painful to switch to a proper parser in a
+	// backwards-compatible manner. Here's an attempt at maximizing backwards
+	// compatibility by re-escaping the characters that libscfg has unescaped,
+	// so that sh(1) can re-unescape these.
+	char *str = NULL;
+	size_t str_size = 0;
+	FILE *f = open_memstream(&str, &str_size);
+	for (size_t i = 0; i < dir->params_len; i++) {
+		const char *param = dir->params[i];
+		if (i > 0) {
+			fprintf(f, " ");
+		}
+		for (size_t j = 0; param[j] != '\0'; j++) {
+			char ch = param[j];
+			if (ch == ' ' || ch == '\t' || ch == '\\' || ch == '\'' || ch == '"') {
+				fprintf(f, "\\");
+			}
+			fprintf(f, "%c", ch);
+		}
 	}
-
-	if (parser->tok_str_len <= 0) {
-		fprintf(stderr, "Ignoring empty command in config file on line %d\n",
-			parser->line);
-		return NULL;
-	}
+	fclose(f);
 
 	struct kanshi_profile_command *command = calloc(1, sizeof(*command));
-	command->command = strdup(parser->tok_str);
+	command->command = str;
 	return command;
 }
 
-static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
+static struct kanshi_profile *parse_profile(struct scfg_directive *dir) {
 	struct kanshi_profile *profile = calloc(1, sizeof(*profile));
 	wl_list_init(&profile->outputs);
 	wl_list_init(&profile->commands);
 
-	if (!parser_next_token(parser)) {
-		return NULL;
+	if (dir->params_len > 1) {
+		fprintf(stderr, "directive 'profile': expected zero or one param\n");
+	}
+	if (dir->params_len > 0) {
+		profile->name = strdup(dir->params[0]);
 	}
 
-	switch (parser->tok_type) {
-	case KANSHI_TOKEN_LBRACKET:
-		break;
-	case KANSHI_TOKEN_STR:
-		// Parse an optional profile name
-		profile->name = strdup(parser->tok_str);
-		if (!parser_expect_token(parser, KANSHI_TOKEN_LBRACKET)) {
-			return NULL;
-		}
-		break;
-	default:
-		fprintf(stderr, "unexpected %s, expected '{' or a profile name\n",
-			token_type_str(parser->tok_type));
-	}
-
-	// Use the bracket position to generate a default profile name
 	if (profile->name == NULL) {
+		static int anon_profile_num = 1;
 		char generated_name[100];
-		int ret = snprintf(generated_name, sizeof(generated_name),
-				"<anonymous at line %d, col %d>", parser->line, parser->col);
-		if (ret >= 0) {
-			profile->name = strdup(generated_name);
-		} else {
-			profile->name = strdup("<anonymous>");
-		}
+		snprintf(generated_name, sizeof(generated_name),
+			"<anonymous profile %d>", anon_profile_num);
+		anon_profile_num++;
+		profile->name = strdup(generated_name);
 	}
 
-	// Parse the profile commands until the closing bracket
-	while (1) {
-		if (!parser_next_token(parser)) {
-			return NULL;
-		}
+	for (size_t i = 0; i < dir->children.directives_len; i++) {
+		struct scfg_directive *child = &dir->children.directives[i];
 
-		switch (parser->tok_type) {
-		case KANSHI_TOKEN_RBRACKET:
-			return profile;
-		case KANSHI_TOKEN_STR:;
-			const char *directive = parser->tok_str;
-			if (strcmp(directive, "output") == 0) {
-				struct kanshi_profile_output *output =
-					parse_profile_output(parser);
-				if (output == NULL) {
-					return NULL;
-				}
-				// Store wildcard outputs at the end of the list
-				if (strcmp(output->name, "*") == 0) {
-					wl_list_insert(profile->outputs.prev, &output->link);
-				} else {
-					wl_list_insert(&profile->outputs, &output->link);
-				}
-			} else if (strcmp(directive, "exec") == 0) {
-				struct kanshi_profile_command *command =
-					parse_profile_command(parser);
-				if (command == NULL) {
-					return NULL;
-				}
-				// Insert commands at the end to preserve order
-				wl_list_insert(profile->commands.prev, &command->link);
-			} else {
-				fprintf(stderr, "unknown directive '%s' in profile '%s'\n",
-					directive, profile->name);
+		if (strcmp(child->name, "output") == 0) {
+			struct kanshi_profile_output *output =
+				parse_profile_output(child);
+			if (output == NULL) {
 				return NULL;
 			}
-			break;
-		case KANSHI_TOKEN_NEWLINE:
-			break; // No-op
-		default:
-			fprintf(stderr, "unexpected %s in profile '%s'\n",
-				token_type_str(parser->tok_type), profile->name);
+			// Store wildcard outputs at the end of the list
+			if (strcmp(output->name, "*") == 0) {
+				wl_list_insert(profile->outputs.prev, &output->link);
+			} else {
+				wl_list_insert(&profile->outputs, &output->link);
+			}
+		} else if (strcmp(child->name, "exec") == 0) {
+			struct kanshi_profile_command *command = parse_profile_exec(child);
+			if (command == NULL) {
+				return NULL;
+			}
+			// Insert commands at the end to preserve order
+			wl_list_insert(profile->commands.prev, &command->link);
+		} else {
+			fprintf(stderr, "profile '%s': unknown directive '%s'\n",
+				profile->name, child->name);
 			return NULL;
 		}
 	}
+
+	return profile;
 }
 
 static bool parse_config_file(const char *path, struct kanshi_config *config);
 
-static bool parse_include_command(struct kanshi_parser *parser, struct kanshi_config *config) {
-	// Skip the 'include' directive.
-	if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
+static bool parse_include_command(struct scfg_directive *dir, struct kanshi_config *config) {
+	if (dir->params_len != 1) {
+		fprintf(stderr, "directive 'include': expected exactly one parameter\n");
 		return false;
-	}
-
-	if (!parser_read_line(parser)) {
-		return false;
-	}
-
-	if (parser->tok_str_len <= 0) {
-		return true;
 	}
 
 	wordexp_t p;
-	if (wordexp(parser->tok_str, &p, WRDE_SHOWERR | WRDE_UNDEF) != 0) {
-		fprintf(stderr, "Could not expand include path: '%s'\n", parser->tok_str);
+	if (wordexp(dir->params[0], &p, WRDE_SHOWERR | WRDE_UNDEF) != 0) {
+		fprintf(stderr, "Could not expand include path: '%s'\n", dir->params[0]);
 		return false;
 	}
 
@@ -536,75 +327,42 @@ static bool parse_include_command(struct kanshi_parser *parser, struct kanshi_co
 	return true;
 }
 
-static bool _parse_config(struct kanshi_parser *parser, struct kanshi_config *config) {
-	while (1) {
-		int ch = parser_peek_char(parser);
-		if (ch < 0) {
-			return false;
-		} else if (ch == 0) {
-			return true;
-		} else if (ch == '#') {
-			parser_ignore_line(parser);
-			continue;
-		} else if (isspace(ch)) {
-			parser_read_char(parser);
-			continue;
-		}
+static bool _parse_config(struct scfg_block *block, struct kanshi_config *config) {
+	for (size_t i = 0; i < block->directives_len; i++) {
+		struct scfg_directive *dir = &block->directives[i];
 
-		if (ch == '{') {
-			// Legacy profile syntax without a profile directive
-			struct kanshi_profile *profile = parse_profile(parser);
+		if (strcmp(dir->name, "profile") == 0) {
+			struct kanshi_profile *profile = parse_profile(dir);
 			if (!profile) {
 				return false;
 			}
 			wl_list_insert(config->profiles.prev, &profile->link);
+		} else if (strcmp(dir->name, "include") == 0) {
+			if (!parse_include_command(dir, config)) {
+				return false;
+			}
 		} else {
-			if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
-				return false;
-			}
-
-			const char *directive = parser->tok_str;
-			if (strcmp(parser->tok_str, "profile") == 0) {
-				struct kanshi_profile *profile = parse_profile(parser);
-				if (!profile) {
-					return false;
-				}
-				wl_list_insert(config->profiles.prev, &profile->link);
-			} else if (strcmp(parser->tok_str, "include") == 0) {
-				if (!parse_include_command(parser, config)) {
-					return false;
-				}
-			} else {
-				fprintf(stderr, "unknown directive '%s'\n", directive);
-				return false;
-			}
+			fprintf(stderr, "unknown directive '%s'\n", dir->name);
+			return false;
 		}
 	}
+
+	return true;
 }
 
 static bool parse_config_file(const char *path, struct kanshi_config *config) {
-	FILE *f = fopen(path, "r");
-	if (f == NULL) {
-		fprintf(stderr, "failed to open file %s: %s\n",
-			path,
-			strerror(errno));
+	struct scfg_block block = {0};
+	if (scfg_load_file(&block, path) != 0) {
+		fprintf(stderr, "failed to parse config file\n");
 		return false;
 	}
 
-	struct kanshi_parser parser = {
-		.f = f,
-		.next = -1,
-		.line = 1,
-	};
-
-	bool res = _parse_config(&parser, config);
-	fclose(f);
-	if (!res) {
-		fprintf(stderr, "failed to parse config file: "
-			"error on line %d, column %d\n", parser.line, parser.col);
+	if (!_parse_config(&block, config)) {
+		fprintf(stderr, "failed to parse config file\n");
 		return false;
 	}
 
+	scfg_block_finish(&block);
 	return true;
 }
 
