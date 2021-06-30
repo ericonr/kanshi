@@ -519,7 +519,7 @@ static void destroy_config(struct kanshi_config *config) {
 
 bool kanshi_reload_config(struct kanshi_state *state) {
 	fprintf(stderr, "reloading config\n");
-	struct kanshi_config *config = read_config();
+	struct kanshi_config *config = read_config(state->config_arg);
 	if (config != NULL) {
 		destroy_config(state->config);
 		state->config = config;
@@ -565,7 +565,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	struct wl_display *display = NULL;
 	struct kanshi_config *config = read_config(config_arg);
 
 	if (config == NULL) {
@@ -581,7 +580,8 @@ int main(int argc, char *argv[]) {
 	struct kanshi_state state = {
 		.running = true,
 		.display = display,
-		.config = config
+		.config = config,
+		.config_arg = config_arg,
 	};
 	int ret = EXIT_SUCCESS;
 #ifdef KANSHI_HAS_VARLINK

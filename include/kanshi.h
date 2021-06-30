@@ -48,6 +48,7 @@ struct kanshi_state {
 #endif
 
 	struct kanshi_config *config;
+	const char *config_arg;
 
 	struct wl_list heads;
 	uint32_t serial;
