@@ -14,6 +14,9 @@
 #include "config.h"
 #include "kanshi.h"
 #include "parser.h"
+#ifdef KANSHI_HAS_VARLINK
+#include "ipc.h"
+#endif
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
 #define HEADS_MAX 64
@@ -529,13 +532,6 @@ bool kanshi_reload_config(struct kanshi_state *state) {
 	}
 	return false;
 }
-
-int kanshi_main_loop(struct kanshi_state *state);
-
-#ifdef KANSHI_HAS_VARLINK
-int kanshi_init_ipc(struct kanshi_state *state);
-void kanshi_free_ipc(struct kanshi_state *state);
-#endif
 
 static const char usage[] = "Usage: %s [options...]\n"
 "  -h, --help           Show help message and quit\n"

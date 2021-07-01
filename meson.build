@@ -55,7 +55,7 @@ kanshi_srcs = [
 if varlink.found()
 	kanshi_deps += varlink
 	kanshi_args += '-DKANSHI_HAS_VARLINK'
-	kanshi_srcs += 'ipc.c'
+	kanshi_srcs += ['ipc.c', 'ipc-addr.c']
 endif
 
 executable(
@@ -71,7 +71,8 @@ if varlink.found()
 	executable(
 			meson.project_name() + 'ctl',
 			files(
-				'ctl.c'
+				'ctl.c',
+				'ipc-addr.c',
 			),
 			include_directories: include_directories('include'),
 			dependencies: [varlink],

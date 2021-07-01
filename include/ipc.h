@@ -4,12 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static int get_ipc_address(char *address, size_t size) {
-	const char *socket = getenv("WAYLAND_DISPLAY");
-	if (socket == NULL) {
-		socket = "wayland-0";
-	}
-	return snprintf(address, size, "unix:@fr.emersion.kanshi.%s", socket);
-}
+#include "kanshi.h"
+
+int kanshi_init_ipc(struct kanshi_state *state);
+void kanshi_free_ipc(struct kanshi_state *state);
+
+int get_ipc_address(char *address, size_t size);
 
 #endif
