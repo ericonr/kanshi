@@ -5,7 +5,7 @@
 #include "kanshi.h"
 #include "ipc.h"
 
-static  void reload_config_done(void *data, struct wl_callback *callback,
+static void reload_config_done(void *data, struct wl_callback *callback,
 		uint32_t serial) {
 	VarlinkCall *call = data;
 	varlink_call_reply(call, NULL, 0);
@@ -20,7 +20,9 @@ static long handle_reload(VarlinkService *service, VarlinkCall *call,
 		VarlinkObject *parameters, uint64_t flags, void *userdata) {
 	struct kanshi_state *state = userdata;
 	kanshi_reload_config(state);
-	// ensure that changes are applied on the server before sending the response
+	// this only ensures that the server has received the configuration request,
+	// the server is free to wait an arbitrary amount of time before applying the configuration
+	// TODO: use the wlr-output-management event instead
 	struct wl_callback *callback = wl_display_sync(state->display);
 	wl_callback_add_listener(callback, &reload_config_listener, call);
 	return 0;
