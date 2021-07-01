@@ -44,7 +44,7 @@ kanshi_deps = [
 	client_protos,
 ]
 
-kanshi_args = []
+kanshi_args = ['-DKANSHI_VERSION="@0@"'.format(meson.project_version())]
 
 kanshi_srcs = [
 	'event-loop.c',
@@ -75,6 +75,7 @@ if varlink.found()
 			),
 			include_directories: include_directories('include'),
 			dependencies: [varlink],
+			c_args: kanshi_args,
 			install: true,
 		)
 endif

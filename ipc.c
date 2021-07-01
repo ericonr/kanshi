@@ -31,7 +31,7 @@ int kanshi_init_ipc(struct kanshi_state *state) {
 	char address[PATH_MAX];
 	get_ipc_address(address, sizeof(address));
 	if (varlink_service_new(&service,
-			"emersion", "kanshi", "1.1", "https://wayland.emersion.fr/kanshi/",
+			"emersion", "kanshi", KANSHI_VERSION, "https://wayland.emersion.fr/kanshi/",
 			address, -1) < 0) {
 		fprintf(stderr, "Couldn't start kanshi varlink service at %s.\n"
 				"Is the kanshi daemon already running?\n", address);
