@@ -52,6 +52,13 @@ static int signal_pipefds[2];
 
 static void signal_handler(int signum) {
 	if (write(signal_pipefds[1], &signum, sizeof(signum)) == -1) {
+		// we can't use stdio inside a signal handler
+		const char error_message[] = "handling signal failed: ";
+		const char *error_string = strerror(errno);
+		write(STDERR_FILENO, error_message, (sizeof error_message) - 1);
+		write(STDERR_FILENO, error_string, strlen(error_string));
+		write(STDERR_FILENO, "\n", 1);
+
 		_exit(signum | 0x80);
 	}
 }
