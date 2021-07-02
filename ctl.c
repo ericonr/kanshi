@@ -63,6 +63,11 @@ int main(int argc, char *argv[]) {
 		usage(argv[0]);
 		return EXIT_SUCCESS;
 	}
+
+	if (check_env()) {
+		return EXIT_FAILURE;
+	}
+
 	VarlinkConnection *connection;
 	char address[PATH_MAX];
 	get_ipc_address(address, sizeof(address));

@@ -4,11 +4,22 @@
 
 #include "ipc.h"
 
-int get_ipc_address(char *address, size_t size) {
-	const char *socket = getenv("WAYLAND_DISPLAY");
-	// if WAYLAND_DISPLAY wasn't set, libwayland will have used "wayland-0"
-	if (socket == NULL) {
-		socket = "wayland-0";
+int check_env(void) {
+	char *wayland_socket = getenv("WAYLAND_DISPLAY");
+	char *xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
+	if (!wayland_socket || !wayland_socket[0]) {
+		fprintf(stderr, "WAYLAND_DISPLAY is not set\n");
+		return -1;
 	}
-	return snprintf(address, size, "unix:@fr.emersion.kanshi.%s", socket);
+	if (!xdg_runtime_dir || !xdg_runtime_dir[0]) {
+		fprintf(stderr, "XDG_RUNTIME_DIR is not set\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+int get_ipc_address(char *address, size_t size) {
+	return snprintf(address, size, "unix:%s/fr.emersion.kanshi.%s",
+			getenv("XDG_RUNTIME_DIR"), getenv("WAYLAND_DISPLAY"));
 }

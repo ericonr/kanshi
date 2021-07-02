@@ -561,6 +561,10 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	if (check_env()) {
+		return EXIT_FAILURE;
+	}
+
 	struct kanshi_config *config = read_config(config_arg);
 
 	if (config == NULL) {
