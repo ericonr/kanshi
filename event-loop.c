@@ -14,16 +14,6 @@
 #include <varlink.h>
 #endif
 
-#define ARRAY_LENGTH(_arr) (sizeof(_arr) / sizeof(*(_arr)))
-
-static int do_poll(struct pollfd *fds, nfds_t nfds) {
-	int ret;
-	do {
-		ret = poll(fds, nfds, -1);
-	} while (ret == -1 && errno == EINTR);
-	return ret;
-}
-
 static int set_pipe_flags(int fd) {
 	int flags = fcntl(fd, F_GETFL);
 	if (flags == -1) {
@@ -93,7 +83,7 @@ int kanshi_main_loop(struct kanshi_state *state) {
 	sigaction(SIGTERM, &action, NULL);
 	sigaction(SIGHUP, &action, NULL);
 
-	struct pollfd readfds[FD_COUNT];
+	struct pollfd readfds[FD_COUNT] = {0};
 	readfds[FD_WAYLAND].fd = wl_display_get_fd(state->display);
 	readfds[FD_WAYLAND].events = POLLIN;
 	readfds[FD_SIGNAL].fd = signal_pipefds[0];
@@ -102,10 +92,6 @@ int kanshi_main_loop(struct kanshi_state *state) {
 	readfds[FD_VARLINK].fd = varlink_service_get_fd(state->service);
 	readfds[FD_VARLINK].events = POLLIN;
 #endif
-
-	struct pollfd writefds[1];
-	writefds[0].fd = readfds[FD_WAYLAND].fd;
-	writefds[0].events = POLLOUT;
 
 	while (state->running) {
 		while (wl_display_prepare_read(state->display) != 0) {
@@ -121,17 +107,17 @@ int kanshi_main_loop(struct kanshi_state *state) {
 			if (ret != -1 || errno != EAGAIN) {
 				break;
 			}
-
-			if (do_poll(writefds, ARRAY_LENGTH(writefds)) == -1) {
-				goto read_error;
-			}
 		}
 
 		if (ret < 0 && errno != EPIPE) {
 			goto read_error;
 		}
 
-		if (do_poll(readfds, ARRAY_LENGTH(readfds)) == -1) {
+		do {
+			ret = poll(readfds, sizeof(readfds) / sizeof(readfds[0]), -1);
+		} while (ret == -1 && errno == EINTR);
+		/* will only be -1 if errno wasn't EINTR */
+		if (ret == -1) {
 			goto read_error;
 		}
 
