@@ -64,12 +64,12 @@ static void signal_handler(int signum) {
 }
 
 enum readfds_type {
-	FD_WAYLAND = 0,
-	FD_SIGNAL = 1,
+	FD_WAYLAND,
+	FD_SIGNAL,
 #ifdef KANSHI_HAS_VARLINK
-	FD_VARLINK = 2,
+	FD_VARLINK,
 #endif
-	FD_COUNT
+	FD_COUNT,
 };
 
 int kanshi_main_loop(struct kanshi_state *state) {
