@@ -9,11 +9,11 @@ sources:
 tasks:
   - setup: |
       cd kanshi
-      meson build -Dauto_features=enabled
+      meson setup build/ -Dauto_features=enabled
   - build: |
       cd kanshi
-      ninja -C build
+      ninja -C build/
   - build-features-disabled: |
       cd kanshi
-      meson build --reconfigure -Dauto_features=disabled
-      ninja -C build
+      meson setup build/ --reconfigure -Dauto_features=disabled
+      ninja -C build/
