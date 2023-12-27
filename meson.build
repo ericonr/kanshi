@@ -46,7 +46,6 @@ subdir('protocol')
 
 kanshi_deps = [
 	wayland_client,
-	client_protos,
 ]
 
 kanshi_srcs = [
@@ -63,7 +62,7 @@ endif
 
 executable(
 	meson.project_name(),
-	kanshi_srcs,
+	kanshi_srcs + protocols_src,
 	include_directories: 'include',
 	dependencies: kanshi_deps,
 	install: true,
