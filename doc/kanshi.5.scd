@@ -82,7 +82,7 @@ quoted (with *"*) if they contain spaces.
 *enable*|*disable*
 	Enables or disables the specified output.
 
-*mode* <width>x<height>[@<rate>[Hz]]
+*mode* [--custom] <width>x<height>[@<rate>[Hz]]
 	Configures the specified output to use the specified mode. Modes are a
 	combination of width and height (in pixels) and a refresh rate (in Hz) that
 	your display can be configured to use.
@@ -92,6 +92,7 @@ quoted (with *"*) if they contain spaces.
 	```
 	output HDMI-A-1 mode 1920x1080
 	output HDMI-A-1 mode 1920x1080@60Hz
+	output HDMI-A-1 mode --custom 1280x720@60Hz
 	```
 
 *position* <x>,<y>
