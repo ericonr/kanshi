@@ -539,9 +539,20 @@ static bool match_and_apply(struct kanshi_state *state,
 	}
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
-		return apply_profile(state, profile, matches, callback, data);
+		if (apply_profile(state, profile, matches, callback, data)) {
+			return true;
+		}
+	} else {
+		fprintf(stderr, "no profile matched\n");
 	}
-	fprintf(stderr, "no profile matched\n");
+
+	// If a profile failed to match or apply, forget the current profile.
+	// This is necessary to make the following scenario work as expected:
+	// have a profile for DP-1 and DP-2, disconnect DP-2, reconnect DP-2.
+	// No profile will be matched in the intermediary state where only DP-1 is
+	// connected, however the profile needs to be re-applied for the final
+	// state.
+	state->current_profile = NULL;
 	return false;
 }
 
