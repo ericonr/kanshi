@@ -16,7 +16,10 @@ include /etc/kanshi/config.d/*
 
 profile {
 	output LVDS-1 disable
-	output "Some Company ASDF 4242" mode 1600x900 position 0,0
+	output "Some Company ASDF 4242" {
+		mode 1600x900
+		position 0,0
+	}
 }
 
 profile nomad {
@@ -39,10 +42,12 @@ profile nomad {
 Profile directives are followed by space-separated arguments. Arguments can be
 quoted (with *"*) if they contain spaces.
 
-*output* <criteria> <output-command...>
+*output* <criteria> <output-directive...>
 	An output directive adds an output to the profile. The criteria can either
 	be an output name, an output description or "\*". The latter can be used to
 	match any output.
+
+	Output directives may be specified in a bracket-delimited block as well.
 
 	On *sway*(1), output names and descriptions can be obtained via
 	*swaymsg -t get_outputs*.
