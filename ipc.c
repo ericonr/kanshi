@@ -120,7 +120,7 @@ int kanshi_init_ipc(struct kanshi_state *state, int listen_fd) {
 	return 0;
 }
 
-void kanshi_free_ipc(struct kanshi_state *state) {
+void kanshi_finish_ipc(struct kanshi_state *state) {
 	if (state->service) {
 		varlink_service_free(state->service);
 		state->service = NULL;

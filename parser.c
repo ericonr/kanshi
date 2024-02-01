@@ -622,3 +622,28 @@ struct kanshi_config *parse_config(const char *path) {
 
 	return config;
 }
+
+void destroy_config(struct kanshi_config *config) {
+	struct kanshi_profile *profile, *profile_tmp;
+	wl_list_for_each_safe(profile, profile_tmp, &config->profiles, link) {
+		struct kanshi_profile_output *output, *output_tmp;
+		wl_list_for_each_safe(output, output_tmp, &profile->outputs, link) {
+			free(output->name);
+			wl_list_remove(&output->link);
+			free(output);
+		}
+
+		struct kanshi_profile_command *cmd, *cmd_tmp;
+		wl_list_for_each_safe(cmd, cmd_tmp, &profile->commands, link) {
+			free(cmd->command);
+			wl_list_remove(&cmd->link);
+			free(cmd);
+		}
+
+		free(profile->name);
+		wl_list_remove(&profile->link);
+		free(profile);
+	}
+
+	free(config);
+}

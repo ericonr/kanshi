@@ -323,6 +323,7 @@ static bool apply_profile(struct kanshi_state *state,
 			zwlr_output_configuration_head_v1_set_adaptive_sync(config_head,
 				profile_output->adaptive_sync);
 		}
+		zwlr_output_configuration_head_v1_destroy(config_head);
 	}
 
 	zwlr_output_configuration_v1_apply(config);
@@ -635,27 +636,6 @@ static struct kanshi_config *read_config(const char *config) {
 	return parse_config(config_path);
 }
 
-static void destroy_config(struct kanshi_config *config) {
-	struct kanshi_profile *profile, *tmp_profile;
-	wl_list_for_each_safe(profile, tmp_profile, &config->profiles, link) {
-		struct kanshi_profile_output *output, *tmp_output;
-		wl_list_for_each_safe(output, tmp_output, &profile->outputs, link) {
-			free(output->name);
-			wl_list_remove(&output->link);
-			free(output);
-		}
-		struct kanshi_profile_command *command, *tmp_command;
-		wl_list_for_each_safe(command, tmp_command, &profile->commands, link) {
-			free(command->command);
-			wl_list_remove(&command->link);
-			free(command);
-		}
-		wl_list_remove(&profile->link);
-		free(profile);
-	}
-	free(config);
-}
-
 bool kanshi_reload_config(struct kanshi_state *state,
 		kanshi_apply_done_func callback, void *data) {
 	fprintf(stderr, "reloading config\n");
@@ -755,8 +735,11 @@ int main(int argc, char *argv[]) {
 
 done:
 #if KANSHI_HAS_VARLINK
-	kanshi_free_ipc(&state);
+	kanshi_finish_ipc(&state);
 #endif
+	destroy_config(state.config);
+	zwlr_output_manager_v1_destroy(state.output_manager);
+	wl_registry_destroy(registry);
 	wl_display_disconnect(display);
 
 	return ret;
