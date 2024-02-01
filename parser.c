@@ -124,88 +124,106 @@ static bool parse_bool(bool *dst, const char *str) {
 	return true;
 }
 
+static ssize_t parse_profile_output_param(struct kanshi_profile_output *output,
+		const char *name, char **params, size_t params_len) {
+	if (strcmp(name, "enable") == 0) {
+		output->fields |= KANSHI_OUTPUT_ENABLED;
+		output->enabled = true;
+		return 0;
+	} else if (strcmp(name, "disable") == 0) {
+		output->fields |= KANSHI_OUTPUT_ENABLED;
+		output->enabled = false;
+		return 0;
+	}
+
+	if (params_len == 0) {
+		fprintf(stderr, "output directive '%s' requires at least one param\n",
+			name);
+		return -1;
+	}
+
+	char *value = params[0];
+	enum kanshi_output_field key;
+	size_t n = 1;
+	if (strcmp(name, "mode") == 0) {
+		key = KANSHI_OUTPUT_MODE;
+		if (strcmp(value, "--custom") == 0) {
+			output->mode.custom = true;
+			if (params_len < 2) {
+				fprintf(stderr, "output directive 'mode' is missing param\n");
+				return -1;
+			}
+			value = params[1];
+			n++;
+		}
+		if (!parse_mode(output, value)) {
+			return -1;
+		}
+	} else if (strcmp(name, "position") == 0) {
+		key = KANSHI_OUTPUT_POSITION;
+		if (!parse_position(output, value)) {
+			return -1;
+		}
+	} else if (strcmp(name, "scale") == 0) {
+		key = KANSHI_OUTPUT_SCALE;
+		if (!parse_float(&output->scale, value)) {
+			fprintf(stderr, "invalid output scale\n");
+			return -1;
+		}
+	} else if (strcmp(name, "transform") == 0) {
+		key = KANSHI_OUTPUT_TRANSFORM;
+		if (!parse_transform(&output->transform, value)) {
+			fprintf(stderr, "invalid output transform\n");
+			return -1;
+		}
+	} else if (strcmp(name, "adaptive_sync") == 0) {
+		key = KANSHI_OUTPUT_ADAPTIVE_SYNC;
+		if (!parse_bool(&output->adaptive_sync, value)) {
+			fprintf(stderr, "invalid output adaptive_sync\n");
+			return -1;
+		}
+	} else {
+		fprintf(stderr,
+			"unknown directive '%s' in profile output '%s'\n",
+			name, output->name);
+		return false;
+	}
+
+	output->fields |= key;
+	return n;
+}
+
 static struct kanshi_profile_output *parse_profile_output(
 		struct scfg_directive *dir) {
-	struct kanshi_profile_output *output = calloc(1, sizeof(*output));
-
 	if (dir->params_len == 0) {
 		fprintf(stderr, "directive 'output': expected at least one param\n");
 		return NULL;
 	}
+
+	struct kanshi_profile_output *output = calloc(1, sizeof(*output));
 	output->name = strdup(dir->params[0]);
 
-	bool has_key = false;
-	enum kanshi_output_field key;
-	for (size_t i = 1; i < dir->params_len; i++) {
-		char *param = dir->params[i];
+	size_t i = 1;
+	while (i < dir->params_len) {
+		const char *name = dir->params[i];
+		ssize_t n = parse_profile_output_param(output, name,
+			&dir->params[i + 1], dir->params_len - i - 1);
+		if (n < 0) {
+			return NULL;
+		}
+		i += 1 + n;
+	}
 
-		if (has_key) {
-			char *value = param;
-			switch (key) {
-			case KANSHI_OUTPUT_MODE:
-				if (strcmp(value, "--custom") == 0) {
-					output->mode.custom = true;
-					continue;
-				}
-				if (!parse_mode(output, value)) {
-					return NULL;
-				}
-				break;
-			case KANSHI_OUTPUT_POSITION:
-				if (!parse_position(output, value)) {
-					return NULL;
-				}
-				break;
-			case KANSHI_OUTPUT_SCALE:
-				if (!parse_float(&output->scale, value)) {
-					fprintf(stderr, "invalid output scale\n");
-					return NULL;
-				}
-				break;
-			case KANSHI_OUTPUT_TRANSFORM:
-				if (!parse_transform(&output->transform, value)) {
-					fprintf(stderr, "invalid output transform\n");
-					return NULL;
-				}
-				break;
-			case KANSHI_OUTPUT_ADAPTIVE_SYNC:
-				if (!parse_bool(&output->adaptive_sync, value)) {
-					fprintf(stderr, "invalid output adaptive_sync\n");
-					return NULL;
-				}
-				break;
-			default:
-				abort();
-			}
-			has_key = false;
-			output->fields |= key;
-		} else {
-			has_key = true;
-			const char *key_str = param;
-			if (strcmp(key_str, "enable") == 0) {
-				output->enabled = true;
-				output->fields |= KANSHI_OUTPUT_ENABLED;
-				has_key = false;
-			} else if (strcmp(key_str, "disable") == 0) {
-				output->enabled = false;
-				output->fields |= KANSHI_OUTPUT_ENABLED;
-				has_key = false;
-			} else if (strcmp(key_str, "mode") == 0) {
-				key = KANSHI_OUTPUT_MODE;
-			} else if (strcmp(key_str, "position") == 0) {
-				key = KANSHI_OUTPUT_POSITION;
-			} else if (strcmp(key_str, "scale") == 0) {
-				key = KANSHI_OUTPUT_SCALE;
-			} else if (strcmp(key_str, "transform") == 0) {
-				key = KANSHI_OUTPUT_TRANSFORM;
-			} else if (strcmp(key_str, "adaptive_sync") == 0) {
-				key = KANSHI_OUTPUT_ADAPTIVE_SYNC;
-			} else {
-				fprintf(stderr,
-					"unknown directive '%s' in profile output '%s'\n",
-					key_str, output->name);
-				return NULL;
-			}
+	for (size_t i = 0; i < dir->children.directives_len; i++) {
+		const struct scfg_directive *child = &dir->children.directives[i];
+
+		ssize_t n = parse_profile_output_param(output, child->name,
+			child->params, child->params_len);
+		if (n < 0) {
+			return NULL;
+		} else if ((size_t)n != child->params_len) {
+			fprintf(stderr, "directive 'output': only one directive per line is allowed in output blocks\n");
+			return NULL;
 		}
 	}
 
