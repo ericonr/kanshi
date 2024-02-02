@@ -197,6 +197,7 @@ static struct kanshi_profile_output *parse_profile_output(
 		struct scfg_directive *dir) {
 	if (dir->params_len == 0) {
 		fprintf(stderr, "directive 'output': expected at least one param\n");
+		fprintf(stderr, "(on line %d)\n", dir->lineno);
 		return NULL;
 	}
 
@@ -209,6 +210,7 @@ static struct kanshi_profile_output *parse_profile_output(
 		ssize_t n = parse_profile_output_param(output, name,
 			&dir->params[i + 1], dir->params_len - i - 1);
 		if (n < 0) {
+			fprintf(stderr, "(on line %d)\n", dir->lineno);
 			return NULL;
 		}
 		i += 1 + n;
@@ -220,6 +222,7 @@ static struct kanshi_profile_output *parse_profile_output(
 		ssize_t n = parse_profile_output_param(output, child->name,
 			child->params, child->params_len);
 		if (n < 0) {
+			fprintf(stderr, "(on line %d)\n", child->lineno);
 			return NULL;
 		} else if ((size_t)n != child->params_len) {
 			fprintf(stderr, "directive 'output': only one directive per line is allowed in output blocks\n");
@@ -234,6 +237,7 @@ static struct kanshi_profile_command *parse_profile_exec(
 		struct scfg_directive *dir) {
 	if (dir->params_len == 0) {
 		fprintf(stderr, "directive 'exec': expected at least one param\n");
+		fprintf(stderr, "(on line %d)\n", dir->lineno);
 		return NULL;
 	}
 
@@ -273,6 +277,8 @@ static struct kanshi_profile *parse_profile(struct scfg_directive *dir) {
 
 	if (dir->params_len > 1) {
 		fprintf(stderr, "directive 'profile': expected zero or one param\n");
+		fprintf(stderr, "(on line %d)\n", dir->lineno);
+		return NULL;
 	}
 	if (dir->params_len > 0) {
 		profile->name = strdup(dir->params[0]);
@@ -312,6 +318,7 @@ static struct kanshi_profile *parse_profile(struct scfg_directive *dir) {
 		} else {
 			fprintf(stderr, "profile '%s': unknown directive '%s'\n",
 				profile->name, child->name);
+			fprintf(stderr, "(on line %d)\n", child->lineno);
 			return NULL;
 		}
 	}
@@ -324,6 +331,7 @@ static bool parse_config_file(const char *path, struct kanshi_config *config);
 static bool parse_include_command(struct scfg_directive *dir, struct kanshi_config *config) {
 	if (dir->params_len != 1) {
 		fprintf(stderr, "directive 'include': expected exactly one parameter\n");
+		fprintf(stderr, "(on line %d)\n", dir->lineno);
 		return false;
 	}
 
@@ -361,6 +369,7 @@ static bool _parse_config(struct scfg_block *block, struct kanshi_config *config
 			}
 		} else {
 			fprintf(stderr, "unknown directive '%s'\n", dir->name);
+			fprintf(stderr, "(on line %d)\n", dir->lineno);
 			return false;
 		}
 	}
