@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>

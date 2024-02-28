@@ -39,6 +39,7 @@ scfg = dependency('scfg')
 varlink = dependency('libvarlink', required: get_option('ipc'))
 
 add_project_arguments([
+	'-D_POSIX_C_SOURCE=200809L',
 	'-DKANSHI_VERSION="@0@"'.format(meson.project_version()),
 	'-DKANSHI_HAS_VARLINK=@0@'.format(varlink.found().to_int()),
 ], language: 'c')
