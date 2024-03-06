@@ -707,11 +707,9 @@ int main(int argc, char *argv[]) {
 		.config = config,
 		.config_arg = config_arg,
 	};
-	int ret = EXIT_SUCCESS;
 #if KANSHI_HAS_VARLINK
 	if (kanshi_init_ipc(&state, listen_fd) != 0) {
-		ret = EXIT_FAILURE;
-		goto done;
+		return EXIT_FAILURE;
 	}
 #endif
 	wl_list_init(&state.heads);
@@ -726,13 +724,11 @@ int main(int argc, char *argv[]) {
 	if (state.output_manager == NULL) {
 		fprintf(stderr, "compositor doesn't support "
 			"wlr-output-management-unstable-v1\n");
-		ret = EXIT_FAILURE;
-		goto done;
+		return EXIT_FAILURE;
 	}
 
-	ret = kanshi_main_loop(&state);
+	int ret = kanshi_main_loop(&state);
 
-done:
 #if KANSHI_HAS_VARLINK
 	kanshi_finish_ipc(&state);
 #endif
