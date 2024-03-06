@@ -35,7 +35,7 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
-scfg = dependency('scfg')
+scfg = dependency('scfg', fallback: 'libscfg')
 varlink = dependency('libvarlink', required: get_option('ipc'))
 
 add_project_arguments([
