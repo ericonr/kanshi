@@ -43,14 +43,23 @@ Profile directives are followed by space-separated arguments. Arguments can be
 quoted (with *"*) if they contain spaces.
 
 *output* <criteria> <output-directive...>
-	An output directive adds an output to the profile. The criteria can either
-	be an output name, an output description or "\*". The latter can be used to
-	match any output.
+	An output directive adds an output to the profile.
+
+	The criteria can be one of:
+
+	- An output name (e.g. "DP-1"). Note, output names may not be stable: they
+	  may change across reboots (depending on kernel driver probe order) or
+	  creation order (typically for USB-C docks).
+	- A space-separated string containing the output manufacturer, model and
+	  serial number (e.g. "Foocorp ASDF 1234"). If one of these fields is
+	  missing, it needs to be populated with the string "Unknown" (e.g.
+	  "Foocorp ASDF Unknown").
+	- A wildcard "\*", to match any output.
 
 	Output directives may be specified in a bracket-delimited block as well.
 
-	On *sway*(1), output names and descriptions can be obtained via
-	*swaymsg -t get_outputs*.
+	On *sway*(1), output names and identifiers can be obtained via
+	"swaymsg -t get_outputs".
 
 *exec* <command>
 	An exec directive executes a command when the profile was successfully
