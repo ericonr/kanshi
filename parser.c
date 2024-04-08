@@ -201,6 +201,7 @@ static struct kanshi_profile_output *parse_profile_output(
 	}
 
 	struct kanshi_profile_output *output = calloc(1, sizeof(*output));
+
 	output->name = strdup(dir->params[0]);
 
 	size_t i = 1;
@@ -296,8 +297,7 @@ static struct kanshi_profile *parse_profile(struct scfg_directive *dir) {
 		struct scfg_directive *child = &dir->children.directives[i];
 
 		if (strcmp(child->name, "output") == 0) {
-			struct kanshi_profile_output *output =
-				parse_profile_output(child);
+			struct kanshi_profile_output *output = parse_profile_output(child);
 			if (output == NULL) {
 				return NULL;
 			}
@@ -362,6 +362,12 @@ static bool _parse_config(struct scfg_block *block, struct kanshi_config *config
 				return false;
 			}
 			wl_list_insert(config->profiles.prev, &profile->link);
+		} else if (strcmp(dir->name, "output") == 0) {
+			struct kanshi_profile_output *output_default = parse_profile_output(dir);
+			if (!output_default) {
+				return false;
+			}
+			wl_list_insert(config->output_defaults.prev, &output_default->link);
 		} else if (strcmp(dir->name, "include") == 0) {
 			if (!parse_include_command(dir, config)) {
 				return false;
@@ -392,11 +398,52 @@ static bool parse_config_file(const char *path, struct kanshi_config *config) {
 	return true;
 }
 
+static void apply_output_defaults(struct kanshi_profile_output *profile_output,
+		const struct kanshi_profile_output *output_default) {
+	profile_output->fields |= output_default->fields;
+
+	if (!(profile_output->fields & KANSHI_OUTPUT_ENABLED)) {
+		profile_output->enabled = output_default->enabled;
+	}
+	if (!(profile_output->fields & KANSHI_OUTPUT_MODE)) {
+		profile_output->mode = output_default->mode;
+	}
+	if (!(profile_output->fields & KANSHI_OUTPUT_POSITION)) {
+		profile_output->position = output_default->position;
+	}
+	if (!(profile_output->fields & KANSHI_OUTPUT_SCALE)) {
+		profile_output->scale = output_default->scale;
+	}
+	if (!(profile_output->fields & KANSHI_OUTPUT_TRANSFORM)) {
+		profile_output->transform = output_default->transform;
+	}
+	if (!(profile_output->fields & KANSHI_OUTPUT_ADAPTIVE_SYNC)) {
+		profile_output->adaptive_sync = output_default->adaptive_sync;
+	}
+}
+
+static void resolve_output_defaults(struct kanshi_config *config) {
+	struct kanshi_profile *profile;
+	wl_list_for_each(profile, &config->profiles, link) {
+		struct kanshi_profile_output *profile_output;
+		wl_list_for_each(profile_output, &profile->outputs, link) {
+			struct kanshi_profile_output *output_default;
+			wl_list_for_each(output_default, &config->output_defaults, link) {
+				if (strcmp(profile_output->name, output_default->name) == 0) {
+					apply_output_defaults(profile_output, output_default);
+					break;
+				}
+			}
+		}
+	}
+}
+
 struct kanshi_config *parse_config(const char *path) {
 	struct kanshi_config *config = calloc(1, sizeof(*config));
 	if (config == NULL) {
 		return NULL;
 	}
+	wl_list_init(&config->output_defaults);
 	wl_list_init(&config->profiles);
 
 	if (!parse_config_file(path, config)) {
@@ -404,17 +451,28 @@ struct kanshi_config *parse_config(const char *path) {
 		return NULL;
 	}
 
+	resolve_output_defaults(config);
+
 	return config;
 }
 
+static void destroy_output(struct kanshi_profile_output *output) {
+	free(output->name);
+	wl_list_remove(&output->link);
+	free(output);
+}
+
 void destroy_config(struct kanshi_config *config) {
+	struct kanshi_profile_output *output_default, *tmp_output_default;
+	wl_list_for_each_safe(output_default, tmp_output_default, &config->output_defaults, link) {
+		destroy_output(output_default);
+	}
+
 	struct kanshi_profile *profile, *profile_tmp;
 	wl_list_for_each_safe(profile, profile_tmp, &config->profiles, link) {
 		struct kanshi_profile_output *output, *output_tmp;
 		wl_list_for_each_safe(output, output_tmp, &profile->outputs, link) {
-			free(output->name);
-			wl_list_remove(&output->link);
-			free(output);
+			destroy_output(output);
 		}
 
 		struct kanshi_profile_command *cmd, *cmd_tmp;

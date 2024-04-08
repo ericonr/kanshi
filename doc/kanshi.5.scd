@@ -33,6 +33,26 @@ profile nomad {
 	Defines a new profile using the specified bracket-delimited profile
 	directives. A name can be specified but is optional.
 
+*output* <criteria> <output-directive...>
+	Defines defaults for output directives inside profile definitions.
+
+	These defaults only apply when the respective output is mentioned in a
+	specific profile. For example, the following two profiles are equivalent:
+
+	```
+	output eDP-1 scale 2
+
+	profile manual {
+		output eDP-1 scale 2
+	}
+
+	profile uses-defaults {
+		output eDP-1
+	}
+	```
+
+	Output directives may be specified in a bracket-delimited block as well.
+
 *include* <path>
 	Include as another file from _path_. Expands shell syntax (see *wordexp*(3)
 	for details).

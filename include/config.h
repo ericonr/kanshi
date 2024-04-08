@@ -46,6 +46,7 @@ struct kanshi_profile {
 };
 
 struct kanshi_config {
+	struct wl_list output_defaults;
 	struct wl_list profiles;
 };
 
