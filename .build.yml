@@ -3,6 +3,7 @@ packages:
   - meson
   - wayland
   - scdoc
+  - libscfg
   - libvarlink
 sources:
   - https://git.sr.ht/~emersion/kanshi
