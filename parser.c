@@ -181,6 +181,14 @@ static ssize_t parse_profile_output_param(struct kanshi_profile_output *output,
 			fprintf(stderr, "invalid output adaptive_sync\n");
 			return -1;
 		}
+	} else if (strcmp(name, "alias") == 0) {
+		if (value[0] != '$') {
+			fprintf(stderr, "invalid output alias '%s', must start with $\n", value);
+			return -1;
+		} else {
+			output->alias = strdup(value);
+			return n;
+		}
 	} else {
 		fprintf(stderr,
 			"unknown directive '%s' in profile output '%s'\n",
@@ -302,6 +310,13 @@ static struct kanshi_profile *parse_profile(struct scfg_directive *dir) {
 				return NULL;
 			}
 
+			// Disallow defining aliases in profile scope
+			if (output->alias != NULL) {
+				fprintf(stderr, "directive 'output': output aliases can only be defined in global scope\n");
+				fprintf(stderr, "(on line %d)\n", dir->lineno);
+				return NULL;
+			}
+
 			// Check for duplicate outputs in profile
 			struct kanshi_profile_output *other_output;
 			wl_list_for_each(other_output, &profile->outputs, link) {
@@ -379,6 +394,13 @@ static bool _parse_config(struct scfg_block *block, struct kanshi_config *config
 				return false;
 			}
 
+			// Disallow using aliases in global scope
+			if (output_default->name[0] == '$') {
+				fprintf(stderr, "directive 'output': output aliases can only be used in profile scope\n");
+				fprintf(stderr, "(on line %d)\n", dir->lineno);
+				return NULL;
+			}
+
 			// Check for duplicate outputs in global scope
 			struct kanshi_profile_output *other_output;
 			wl_list_for_each(other_output, &config->output_defaults, link) {
@@ -444,20 +466,34 @@ static void apply_output_defaults(struct kanshi_profile_output *profile_output,
 	}
 }
 
-static void resolve_output_defaults(struct kanshi_config *config) {
+static bool resolve_output_defaults(struct kanshi_config *config) {
 	struct kanshi_profile *profile;
 	wl_list_for_each(profile, &config->profiles, link) {
 		struct kanshi_profile_output *profile_output;
 		wl_list_for_each(profile_output, &profile->outputs, link) {
 			struct kanshi_profile_output *output_default;
 			wl_list_for_each(output_default, &config->output_defaults, link) {
+				// check if profile output uses an alias
+				if (output_default->alias != NULL && strcmp(profile_output->name, output_default->alias) == 0) {
+					free(profile_output->name);
+					profile_output->name = strdup(output_default->name);
+				}
+
+				// apply output defaults
 				if (strcmp(profile_output->name, output_default->name) == 0) {
 					apply_output_defaults(profile_output, output_default);
 					break;
 				}
 			}
+
+			if (profile_output->name[0] == '$') {
+				fprintf(stderr, "profile '%s': use of undefined output alias '%s'\n", profile->name, profile_output->name);
+				return false;
+			}
 		}
 	}
+
+	return true;
 }
 
 struct kanshi_config *parse_config(const char *path) {
@@ -473,13 +509,17 @@ struct kanshi_config *parse_config(const char *path) {
 		return NULL;
 	}
 
-	resolve_output_defaults(config);
+	if (!resolve_output_defaults(config)) {
+		free(config);
+		return NULL;
+	}
 
 	return config;
 }
 
 static void destroy_output(struct kanshi_profile_output *output) {
 	free(output->name);
+	free(output->alias);
 	wl_list_remove(&output->link);
 	free(output);
 }

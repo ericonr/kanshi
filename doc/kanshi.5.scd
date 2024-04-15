@@ -74,6 +74,8 @@ quoted (with *"*) if they contain spaces.
 	  serial number (e.g. "Foocorp ASDF 1234"). If one of these fields is
 	  missing, it needs to be populated with the string "Unknown" (e.g.
 	  "Foocorp ASDF Unknown").
+	- An output alias (e.g. "$work-desk3") defined by an output alias directive.
+	  Output aliases can only be used in profile scope.
 	- A wildcard "\*", to match any output.
 
 	Output directives may be specified in a bracket-delimited block as well.
@@ -148,6 +150,10 @@ quoted (with *"*) if they contain spaces.
 
 *adaptive_sync* on|off
 	Enables or disables adaptive synchronization (aka. Variable Refresh Rate).
+
+*alias* $<name>
+	Defines an alias for this output. Output aliases can only be defined in
+	global scope.
 
 # AUTHORS
 

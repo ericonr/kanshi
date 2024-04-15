@@ -30,6 +30,7 @@ struct kanshi_profile_output {
 	float scale;
 	enum wl_output_transform transform;
 	bool adaptive_sync;
+	char *alias;
 };
 
 struct kanshi_profile_command {
