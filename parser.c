@@ -301,6 +301,17 @@ static struct kanshi_profile *parse_profile(struct scfg_directive *dir) {
 			if (output == NULL) {
 				return NULL;
 			}
+
+			// Check for duplicate outputs in profile
+			struct kanshi_profile_output *other_output;
+			wl_list_for_each(other_output, &profile->outputs, link) {
+				if (strcmp(output->name, other_output->name) == 0) {
+					fprintf(stderr, "directive 'output': duplicate output '%s' in profile\n", output->name);
+					fprintf(stderr, "(on line %d)\n", dir->lineno);
+					return NULL;
+				}
+			}
+
 			// Store wildcard outputs at the end of the list
 			if (strcmp(output->name, "*") == 0) {
 				wl_list_insert(profile->outputs.prev, &output->link);
@@ -367,6 +378,17 @@ static bool _parse_config(struct scfg_block *block, struct kanshi_config *config
 			if (!output_default) {
 				return false;
 			}
+
+			// Check for duplicate outputs in global scope
+			struct kanshi_profile_output *other_output;
+			wl_list_for_each(other_output, &config->output_defaults, link) {
+				if (strcmp(output_default->name, other_output->name) == 0) {
+					fprintf(stderr, "directive 'output': duplicate output '%s' in global scope\n", output_default->name);
+					fprintf(stderr, "(on line %d)\n", dir->lineno);
+					return NULL;
+				}
+			}
+
 			wl_list_insert(config->output_defaults.prev, &output_default->link);
 		} else if (strcmp(dir->name, "include") == 0) {
 			if (!parse_include_command(dir, config)) {
