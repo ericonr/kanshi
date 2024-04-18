@@ -443,8 +443,6 @@ static bool parse_config_file(const char *path, struct kanshi_config *config) {
 
 static void apply_output_defaults(struct kanshi_profile_output *profile_output,
 		const struct kanshi_profile_output *output_default) {
-	profile_output->fields |= output_default->fields;
-
 	if (!(profile_output->fields & KANSHI_OUTPUT_ENABLED)) {
 		profile_output->enabled = output_default->enabled;
 	}
@@ -463,6 +461,8 @@ static void apply_output_defaults(struct kanshi_profile_output *profile_output,
 	if (!(profile_output->fields & KANSHI_OUTPUT_ADAPTIVE_SYNC)) {
 		profile_output->adaptive_sync = output_default->adaptive_sync;
 	}
+
+	profile_output->fields |= output_default->fields;
 }
 
 static bool resolve_output_defaults(struct kanshi_config *config) {
