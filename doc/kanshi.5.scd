@@ -77,6 +77,7 @@ quoted (with *"*) if they contain spaces.
 	- An output alias (e.g. "$work-desk3") defined by an output alias directive.
 	  Output aliases can only be used in profile scope.
 	- A wildcard "\*", to match any output.
+	  Wildcards can only be used in profile scope.
 
 	Output directives may be specified in a bracket-delimited block as well.
 

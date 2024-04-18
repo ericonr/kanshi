@@ -393,6 +393,13 @@ static bool _parse_config(struct scfg_block *block, struct kanshi_config *config
 				return false;
 			}
 
+			// Disallow using wildcard outputs in global scope
+			if (strcmp(output_default->name, "*") == 0) {
+				fprintf(stderr, "directive 'output': wildcard outputs can only be used in profile scope\n");
+				fprintf(stderr, "(on line %d)\n", dir->lineno);
+				return NULL;
+			}
+
 			// Disallow using aliases in global scope
 			if (output_default->name[0] == '$') {
 				fprintf(stderr, "directive 'output': output aliases can only be used in profile scope\n");
