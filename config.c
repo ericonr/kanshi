@@ -10,7 +10,6 @@
 #include <wayland-client.h>
 
 #include "config.h"
-#include "parser.h"
 
 static bool parse_int(int *dst, const char *str) {
 	char *end;

@@ -54,7 +54,7 @@ kanshi_deps = [
 kanshi_srcs = [
 	'event-loop.c',
 	'main.c',
-	'parser.c',
+	'config.c',
 	'ipc-addr.c',
 ]
 

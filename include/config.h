@@ -51,4 +51,7 @@ struct kanshi_config {
 	struct wl_list profiles;
 };
 
+struct kanshi_config *parse_config(const char *path);
+void destroy_config(struct kanshi_config *config);
+
 #endif

@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <limits.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -13,7 +14,6 @@
 
 #include "config.h"
 #include "kanshi.h"
-#include "parser.h"
 #include "ipc.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
