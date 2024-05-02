@@ -48,18 +48,23 @@ static long handle_switch(VarlinkService *service, VarlinkCall *call,
 
 	struct kanshi_profile *profile;
 	bool found = false;
+	bool matched = false;
 	wl_list_for_each(profile, &state->config->profiles, link) {
-		if (strcmp(profile->name, profile_name) == 0) {
-			found = true;
+		if (strcmp(profile->name, profile_name) != 0) {
+			continue;
+		}
+
+		found = true;
+		if (kanshi_switch(state, profile, apply_profile_done, call)) {
+			matched = true;
 			break;
 		}
 	}
 	if (!found) {
 		return reply_error(call, "fr.emersion.kanshi.ProfileNotFound");
 	}
-
-	if (!kanshi_switch(state, profile, apply_profile_done, call)) {
-		return reply_error(call, "fr.emersion.kanshi.ProfileNotMatched");
+	if (!matched) {
+			return reply_error(call, "fr.emersion.kanshi.ProfileNotMatched");
 	}
 
 	return 0;
