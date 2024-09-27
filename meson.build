@@ -37,6 +37,7 @@ add_project_arguments(cc.get_supported_arguments([
 wayland_client = dependency('wayland-client')
 scfg = dependency('scfg', fallback: 'libscfg')
 varlink = dependency('libvarlink', required: get_option('ipc'))
+varlinkgen = dependency('varlinkgen', required: get_option('ipc'))
 
 add_project_arguments([
 	'-D_POSIX_C_SOURCE=200809L',
@@ -61,6 +62,16 @@ kanshi_srcs = [
 if varlink.found()
 	kanshi_deps += varlink
 	kanshi_srcs += ['ipc.c', 'ipc-addr.c']
+endif
+
+if varlinkgen.found()
+	varlinkgen_prog = find_program('varlinkgen')
+	kanshi_gen = custom_target(
+		'kanshi_gen',
+		command: [varlinkgen_prog, '--prefix=kanshi', '@INPUT@', '@OUTPUT0@', '@OUTPUT1@'],
+		input: 'kanshi.varlink',
+		output: ['kanshi-ipc.h', 'kanshi-ipc.c'],
+	)
 endif
 
 executable(
