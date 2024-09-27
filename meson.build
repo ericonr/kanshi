@@ -82,15 +82,16 @@ executable(
 	install: true,
 )
 
-if varlink.found()
+if varlinkgen.found()
 	executable(
 		meson.project_name() + 'ctl',
-		files(
+		[
 			'ctl.c',
 			'ipc-addr.c',
-		),
+			kanshi_gen,
+		],
 		include_directories: 'include',
-		dependencies: [varlink],
+		dependencies: [varlinkgen],
 		install: true,
 	)
 endif
