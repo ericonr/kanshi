@@ -45,8 +45,7 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	/* XXX: remove +5 ("unix:" prefix) when kanshi starts using varlinkgen */
-	struct varlinkgen_client *client = varlinkgen_client_connect_unix(address+5);
+	struct varlinkgen_client *client = varlinkgen_client_connect_unix(address);
 	if (client == NULL) {
 		fprintf(stderr, "Couldn't connect to kanshi at %s.\n"
 				"Is the kanshi daemon running?\n", address);

@@ -99,10 +99,9 @@ int kanshi_init_ipc(struct kanshi_state *state, int listen_fd) {
 	varlinkgen_registry_add(registry, &kanshi_interface, kanshi_get_call_handler(&kanshi_handler));
 	varlinkgen_service_set_call_handler(service, varlinkgen_registry_get_call_handler(registry));
 
-	/* XXX: remove +5 ("unix:" prefix) when kanshi starts using varlinkgen */
 	if (listen_fd < 0) {
-		unlink(address+5);
-		if (!varlinkgen_service_listen_unix(service, address+5)) {
+		unlink(address);
+		if (!varlinkgen_service_listen_unix(service, address)) {
 			return -1;
 		}
 	} else {
