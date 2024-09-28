@@ -16,7 +16,6 @@ Dependencies:
 * wayland-client
 * [libscfg]
 * scdoc (optional, for man pages)
-* libvarlink (optional, for remote control functionality)
 * varlinkgen (optional, for remote control functionality)
 
 ```sh

@@ -36,7 +36,6 @@ add_project_arguments(cc.get_supported_arguments([
 
 wayland_client = dependency('wayland-client')
 scfg = dependency('scfg', fallback: 'libscfg')
-varlink = dependency('libvarlink', required: get_option('ipc'))
 varlinkgen = dependency('varlinkgen', required: get_option('ipc'))
 
 add_project_arguments([
@@ -98,5 +97,5 @@ subdir('doc')
 
 summary({
 	'Man pages': scdoc.found(),
-	'IPC': varlink.found(),
+	'IPC': varlinkgen.found(),
 }, bool_yn: true)
