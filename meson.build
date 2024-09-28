@@ -42,7 +42,7 @@ varlinkgen = dependency('varlinkgen', required: get_option('ipc'))
 add_project_arguments([
 	'-D_POSIX_C_SOURCE=200809L',
 	'-DKANSHI_VERSION="@0@"'.format(meson.project_version()),
-	'-DKANSHI_HAS_VARLINK=@0@'.format(varlink.found().to_int()),
+	'-DKANSHI_HAS_VARLINK=@0@'.format(varlinkgen.found().to_int()),
 ], language: 'c')
 
 subdir('protocol')
@@ -59,11 +59,6 @@ kanshi_srcs = [
 	'ipc-addr.c',
 ]
 
-if varlink.found()
-	kanshi_deps += varlink
-	kanshi_srcs += ['ipc.c', 'ipc-addr.c']
-endif
-
 if varlinkgen.found()
 	varlinkgen_prog = find_program('varlinkgen')
 	kanshi_gen = custom_target(
@@ -72,6 +67,9 @@ if varlinkgen.found()
 		input: 'kanshi.varlink',
 		output: ['kanshi-ipc.h', 'kanshi-ipc.c'],
 	)
+
+	kanshi_deps += varlinkgen
+	kanshi_srcs += ['ipc.c', 'ipc-addr.c', kanshi_gen]
 endif
 
 executable(
