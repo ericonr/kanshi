@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <varlinkgen.h>
@@ -10,44 +11,43 @@
 #include "kanshi.h"
 #include "ipc.h"
 
-struct apply_profile_done_data {
-	struct varlinkgen_service_call *call;
-	bool success;
-};
-
 static struct kanshi_state *get_state_from_call(struct varlinkgen_service_call *call) {
 	struct varlinkgen_service *service = varlinkgen_service_call_get_service(call);
 	return varlinkgen_service_get_user_data(service);
 }
 
 static void apply_profile_done(void *data, bool success) {
-	struct apply_profile_done_data *pdata = data;
+	struct varlinkgen_service_call *call = data;
 	if (!success) {
-		kanshi_fail_ProfileNotApplied(pdata->call, NULL);
+		kanshi_fail_ProfileNotApplied(call, NULL);
+	} else {
+		const char *method = varlinkgen_service_call_get_method(call);
+		if (strcmp(method, "fr.emersion.kanshi.Reload") == 0) {
+			struct kanshi_Reload_out out = {0};
+			kanshi_Reload_reply(call, &out);
+			kanshi_Reload_out_finish(&out);
+		} else if (strcmp(method, "fr.emersion.kanshi.Switch") == 0) {
+			struct kanshi_Switch_out out = {0};
+			kanshi_Switch_reply(call, &out);
+			kanshi_Switch_out_finish(&out);
+		} else {
+			abort();
+		}
 	}
-	pdata->success = success;
 }
 
-static bool handle_reload(struct varlinkgen_service_call *call, const struct kanshi_Reload_in *in, struct kanshi_Reload_out *out) {
+static bool handle_reload(struct varlinkgen_service_call *call, const struct kanshi_Reload_in *in) {
 	struct kanshi_state *state = get_state_from_call(call);
 
-	struct apply_profile_done_data data = {
-		.call = call,
-	};
-
-	if (!kanshi_reload_config(state, apply_profile_done, &data)) {
-		kanshi_fail_ProfileNotMatched(call, NULL);
-		return false;
+	if (!kanshi_reload_config(state, apply_profile_done, call)) {
+		return kanshi_fail_ProfileNotMatched(call, NULL);
 	}
-	return data.success;
+
+	return true;
 }
 
-static bool handle_switch(struct varlinkgen_service_call *call, const struct kanshi_Switch_in *in, struct kanshi_Switch_out *out) {
+static bool handle_switch(struct varlinkgen_service_call *call, const struct kanshi_Switch_in *in) {
 	struct kanshi_state *state = get_state_from_call(call);
-
-	struct apply_profile_done_data data = {
-		.call = call,
-	};
 
 	struct kanshi_profile *profile;
 	bool found = false;
@@ -58,21 +58,19 @@ static bool handle_switch(struct varlinkgen_service_call *call, const struct kan
 		}
 
 		found = true;
-		if (kanshi_switch(state, profile, apply_profile_done, &data)) {
+		if (kanshi_switch(state, profile, apply_profile_done, call)) {
 			matched = true;
 			break;
 		}
 	}
 	if (!found) {
-		kanshi_fail_ProfileNotFound(call, NULL);
-		return false;
+		return kanshi_fail_ProfileNotFound(call, NULL);
 	}
 	if (!matched) {
-		kanshi_fail_ProfileNotMatched(call, NULL);
-		return false;
+		return kanshi_fail_ProfileNotMatched(call, NULL);
 	}
 
-	return data.success;
+	return true;
 }
 
 static const struct kanshi_handler kanshi_handler = {
