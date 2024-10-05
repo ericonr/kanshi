@@ -1,0 +1,8 @@
+interface fr.emersion.kanshi
+
+method Reload() -> ()
+
+method Switch(profile: string) -> ()
+error ProfileNotFound()
+error ProfileNotMatched()
+error ProfileNotApplied()

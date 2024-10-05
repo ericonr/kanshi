@@ -1,56 +1,59 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <varlink.h>
+#include <unistd.h>
+#include <varlinkgen.h>
 
+#include "kanshi-ipc.h"
 #include "config.h"
 #include "kanshi.h"
 #include "ipc.h"
 
-static long reply_error(VarlinkCall *call, const char *name) {
-	VarlinkObject *params = NULL;
-	long ret = varlink_object_new(&params);
-	if (ret < 0) {
-		return ret;
-	}
-	ret = varlink_call_reply_error(call, name, params);
-	varlink_object_unref(params);
-	return ret;
+static struct kanshi_state *get_state_from_call(struct varlinkgen_service_call *call) {
+	struct varlinkgen_service *service = varlinkgen_service_call_get_service(call);
+	return varlinkgen_service_get_user_data(service);
 }
 
 static void apply_profile_done(void *data, bool success) {
-	VarlinkCall *call = data;
-	if (success) {
-		varlink_call_reply(call, NULL, 0);
+	struct varlinkgen_service_call *call = data;
+	if (!success) {
+		kanshi_fail_ProfileNotApplied(call, NULL);
 	} else {
-		reply_error(call, "fr.emersion.kanshi.ProfileNotApplied");
+		const char *method = varlinkgen_service_call_get_method(call);
+		if (strcmp(method, "fr.emersion.kanshi.Reload") == 0) {
+			struct kanshi_Reload_out out = {0};
+			kanshi_Reload_reply(call, &out);
+			kanshi_Reload_out_finish(&out);
+		} else if (strcmp(method, "fr.emersion.kanshi.Switch") == 0) {
+			struct kanshi_Switch_out out = {0};
+			kanshi_Switch_reply(call, &out);
+			kanshi_Switch_out_finish(&out);
+		} else {
+			abort();
+		}
 	}
 }
 
-static long handle_reload(VarlinkService *service, VarlinkCall *call,
-		VarlinkObject *parameters, uint64_t flags, void *userdata) {
-	struct kanshi_state *state = userdata;
+static bool handle_reload(struct varlinkgen_service_call *call, const struct kanshi_Reload_in *in) {
+	struct kanshi_state *state = get_state_from_call(call);
+
 	if (!kanshi_reload_config(state, apply_profile_done, call)) {
-		return reply_error(call, "fr.emersion.kanshi.ProfileNotMatched");
+		return kanshi_fail_ProfileNotMatched(call, NULL);
 	}
-	return 0;
+
+	return true;
 }
 
-static long handle_switch(VarlinkService *service, VarlinkCall *call,
-		VarlinkObject *parameters, uint64_t flags, void *userdata) {
-	struct kanshi_state *state = userdata;
-
-	const char *profile_name;
-	if (varlink_object_get_string(parameters, "profile", &profile_name) < 0) {
-		return varlink_call_reply_invalid_parameter(call, "profile");
-	}
+static bool handle_switch(struct varlinkgen_service_call *call, const struct kanshi_Switch_in *in) {
+	struct kanshi_state *state = get_state_from_call(call);
 
 	struct kanshi_profile *profile;
 	bool found = false;
 	bool matched = false;
 	wl_list_for_each(profile, &state->config->profiles, link) {
-		if (strcmp(profile->name, profile_name) != 0) {
+		if (strcmp(profile->name, in->profile) != 0) {
 			continue;
 		}
 
@@ -61,62 +64,48 @@ static long handle_switch(VarlinkService *service, VarlinkCall *call,
 		}
 	}
 	if (!found) {
-		return reply_error(call, "fr.emersion.kanshi.ProfileNotFound");
+		return kanshi_fail_ProfileNotFound(call, NULL);
 	}
 	if (!matched) {
-			return reply_error(call, "fr.emersion.kanshi.ProfileNotMatched");
+		return kanshi_fail_ProfileNotMatched(call, NULL);
 	}
 
-	return 0;
+	return true;
 }
 
-static int set_cloexec(int fd) {
-	int flags = fcntl(fd, F_GETFD);
-	if (flags < 0) {
-		perror("fnctl(F_GETFD) failed");
-		return -1;
-	}
-	if (fcntl(fd, F_SETFD, flags | O_CLOEXEC) < 0) {
-		perror("fnctl(F_SETFD) failed");
-		return -1;
-	}
-	return 0;
-}
+static const struct kanshi_handler kanshi_handler = {
+	.Reload = handle_reload,
+	.Switch = handle_switch,
+};
 
 int kanshi_init_ipc(struct kanshi_state *state, int listen_fd) {
-	if (listen_fd >= 0 && set_cloexec(listen_fd) < 0) {
-		return -1;
-	}
+	struct varlinkgen_service *service = varlinkgen_service_create();
+	varlinkgen_service_set_user_data(service, state);
 
-	VarlinkService *service;
 	char address[PATH_MAX];
 	if (get_ipc_address(address, sizeof(address)) < 0) {
 		return -1;
 	}
-	if (varlink_service_new(&service,
-			"emersion", "kanshi", KANSHI_VERSION, "https://wayland.emersion.fr/kanshi/",
-			address, listen_fd) < 0) {
-		fprintf(stderr, "Couldn't start kanshi varlink service at %s.\n"
-				"Is the kanshi daemon already running?\n", address);
-		return -1;
-	}
 
-	const char *interface = "interface fr.emersion.kanshi\n"
-		"method Reload() -> ()\n"
-		"method Switch(profile: string) -> ()\n"
-		"error ProfileNotFound()\n"
-		"error ProfileNotMatched()\n"
-		"error ProfileNotApplied()\n";
+	const struct varlinkgen_registry_options registry_options = {
+		.vendor = "emersion",
+		.product = "kanshi",
+		.version = KANSHI_VERSION,
+		.url = "https://wayland.emersion.fr/kanshi/",
+	};
+	struct varlinkgen_registry *registry = varlinkgen_registry_create(&registry_options);
+	varlinkgen_registry_add(registry, &kanshi_interface, kanshi_get_call_handler(&kanshi_handler));
+	varlinkgen_service_set_call_handler(service, varlinkgen_registry_get_call_handler(registry));
 
-	long result = varlink_service_add_interface(service, interface,
-			"Reload", handle_reload, state,
-			"Switch", handle_switch, state,
-			NULL);
-	if (result != 0) {
-		fprintf(stderr, "varlink_service_add_interface failed: %s\n",
-				varlink_error_string(-result));
-		varlink_service_free(service);
-		return -1;
+	if (listen_fd < 0) {
+		unlink(address);
+		if (!varlinkgen_service_listen_unix(service, address)) {
+			return -1;
+		}
+	} else {
+		if (!varlinkgen_service_listen_fd(service, listen_fd)) {
+			return -1;
+		}
 	}
 
 	state->service = service;
@@ -126,7 +115,7 @@ int kanshi_init_ipc(struct kanshi_state *state, int listen_fd) {
 
 void kanshi_finish_ipc(struct kanshi_state *state) {
 	if (state->service) {
-		varlink_service_free(state->service);
+		varlinkgen_service_destroy(state->service);
 		state->service = NULL;
 	}
 }

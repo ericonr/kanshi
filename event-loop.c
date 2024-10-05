@@ -10,7 +10,7 @@
 #include "kanshi.h"
 
 #if KANSHI_HAS_VARLINK
-#include <varlink.h>
+#include <varlinkgen.h>
 #endif
 
 static int set_pipe_flags(int fd) {
@@ -81,7 +81,7 @@ int kanshi_main_loop(struct kanshi_state *state) {
 	readfds[FD_SIGNAL].fd = signal_pipefds[0];
 	readfds[FD_SIGNAL].events = POLLIN;
 #if KANSHI_HAS_VARLINK
-	readfds[FD_VARLINK].fd = varlink_service_get_fd(state->service);
+	readfds[FD_VARLINK].fd = varlinkgen_service_get_fd(state->service);
 	readfds[FD_VARLINK].events = POLLIN;
 #endif
 
@@ -119,10 +119,8 @@ int kanshi_main_loop(struct kanshi_state *state) {
 
 #if KANSHI_HAS_VARLINK
 		if (readfds[FD_VARLINK].revents & POLLIN) {
-			long result = varlink_service_process_events(state->service);
-			if (result != 0) {
-				fprintf(stderr, "varlink_service_process_events failed: %s\n",
-						varlink_error_string(-result));
+			if (!varlinkgen_service_dispatch(state->service)) {
+				fprintf(stderr, "varlinkgen_service_dispatch failed\n");
 				return EXIT_FAILURE;
 			}
 		}

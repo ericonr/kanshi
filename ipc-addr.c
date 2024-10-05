@@ -15,6 +15,6 @@ int get_ipc_address(char *address, size_t size) {
 		return -1;
 	}
 
-	return snprintf(address, size, "unix:%s/fr.emersion.kanshi.%s",
+	return snprintf(address, size, "%s/fr.emersion.kanshi.%s",
 			xdg_runtime_dir, wayland_display);
 }

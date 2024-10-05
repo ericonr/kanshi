@@ -46,7 +46,7 @@ struct kanshi_state {
 	struct wl_display *display;
 	struct zwlr_output_manager_v1 *output_manager;
 #if KANSHI_HAS_VARLINK
-	struct VarlinkService *service;
+	struct varlinkgen_service *service;
 #endif
 
 	struct kanshi_config *config;

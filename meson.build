@@ -36,12 +36,12 @@ add_project_arguments(cc.get_supported_arguments([
 
 wayland_client = dependency('wayland-client')
 scfg = dependency('scfg', fallback: 'libscfg')
-varlink = dependency('libvarlink', required: get_option('ipc'))
+varlinkgen = dependency('varlinkgen', required: get_option('ipc'))
 
 add_project_arguments([
 	'-D_POSIX_C_SOURCE=200809L',
 	'-DKANSHI_VERSION="@0@"'.format(meson.project_version()),
-	'-DKANSHI_HAS_VARLINK=@0@'.format(varlink.found().to_int()),
+	'-DKANSHI_HAS_VARLINK=@0@'.format(varlinkgen.found().to_int()),
 ], language: 'c')
 
 subdir('protocol')
@@ -58,9 +58,17 @@ kanshi_srcs = [
 	'ipc-addr.c',
 ]
 
-if varlink.found()
-	kanshi_deps += varlink
-	kanshi_srcs += ['ipc.c', 'ipc-addr.c']
+if varlinkgen.found()
+	varlinkgen_prog = find_program('varlinkgen')
+	kanshi_gen = custom_target(
+		'kanshi_gen',
+		command: [varlinkgen_prog, '--prefix=kanshi', '@INPUT@', '@OUTPUT0@', '@OUTPUT1@'],
+		input: 'kanshi.varlink',
+		output: ['kanshi-ipc.h', 'kanshi-ipc.c'],
+	)
+
+	kanshi_deps += varlinkgen
+	kanshi_srcs += ['ipc.c', 'ipc-addr.c', kanshi_gen]
 endif
 
 executable(
@@ -71,15 +79,16 @@ executable(
 	install: true,
 )
 
-if varlink.found()
+if varlinkgen.found()
 	executable(
 		meson.project_name() + 'ctl',
-		files(
+		[
 			'ctl.c',
 			'ipc-addr.c',
-		),
+			kanshi_gen,
+		],
 		include_directories: 'include',
-		dependencies: [varlink],
+		dependencies: [varlinkgen],
 		install: true,
 	)
 endif
@@ -88,5 +97,5 @@ subdir('doc')
 
 summary({
 	'Man pages': scdoc.found(),
-	'IPC': varlink.found(),
+	'IPC': varlinkgen.found(),
 }, bool_yn: true)
